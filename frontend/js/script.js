@@ -7,7 +7,7 @@ const themeToggle = document.getElementById('themeToggle');
 const clearChat = document.getElementById('clearChat');
 
 // API Configuration
-const API_URL = 'http://localhost:5000';
+const API_URL = 'https://college-enquiry-chatbot-1-enxg.onrender.com';
 
 // State
 let isDarkMode = false;
