@@ -19,6 +19,352 @@ except LookupError:
     nltk.download('wordnet')
     nltk.download('averaged_perceptron_tagger')
 
+class Graph:
+    """Represents a graph for route finding"""
+    
+    def __init__(self):
+        self.nodes: dict = {}  # node: (lat, lon)
+        self.edges: dict = {}  # node: {neighbor: cost}
+    
+    def add_node(self, node_id: str, lat: float, lon: float):
+        """Add a node with coordinates"""
+        self.nodes[node_id] = (lat, lon)
+        if node_id not in self.edges:
+            self.edges[node_id] = {}
+    
+    def add_edge(self, from_node: str, to_node: str, distance: float):
+        """Add a weighted edge between nodes"""
+        self.edges[from_node][to_node] = distance
+        self.edges[to_node][from_node] = distance  # undirected graph
+    
+    def get_neighbors(self, node: str) -> dict:
+        """Get all neighbors of a node"""
+        return self.edges.get(node, {})
+    
+    def get_coordinates(self, node: str) -> tuple:
+        """Get coordinates for a node"""
+        return self.nodes.get(node, (0, 0))
+    
+    def heuristic(self, node: str, goal: str) -> float:
+        """Euclidean distance heuristic for A* search"""
+        if node not in self.nodes or goal not in self.nodes:
+            return 0
+        lat1, lon1 = self.nodes[node]
+        lat2, lon2 = self.nodes[goal]
+        return ((lat1 - lat2)**2 + (lon1 - lon2)**2) ** 0.5
+
+
+class RouteFinder:
+    """Intelligent Route Finder using Heuristic Search"""
+    
+    def __init__(self, graph: Graph):
+        self.graph = graph
+        self.performance_stats = {
+            'nodes_expanded': 0,
+            'execution_time': 0,
+            'path_cost': 0
+        }
+    
+    def a_star_search(self, start: str, goal: str):
+        """
+        A* Search Algorithm
+        Combines actual cost (g) + heuristic estimate (h)
+        """
+        import heapq
+        import time
+        
+        start_time = time.time()
+        nodes_expanded = 0
+        
+        # Priority queue: (f_score, current_node, path, g_score)
+        open_set = [(0, start, [start], 0)]
+        visited = set()
+        
+        while open_set:
+            # Get node with lowest f_score
+            f_score, current, path, g_score = heapq.heappop(open_set)
+            nodes_expanded += 1
+            
+            if current == goal:
+                end_time = time.time()
+                self.performance_stats = {
+                    'nodes_expanded': nodes_expanded,
+                    'execution_time': (end_time - start_time) * 1000,  # ms
+                    'path_cost': g_score
+                }
+                return path, g_score
+            
+            if current in visited:
+                continue
+            visited.add(current)
+            
+            # Explore neighbors
+            for neighbor, cost in self.graph.get_neighbors(current).items():
+                if neighbor in visited:
+                    continue
+                
+                tentative_g_score = g_score + cost
+                h_score = self.graph.heuristic(neighbor, goal)
+                f_score = tentative_g_score + h_score
+                
+                heapq.heappush(open_set, (f_score, neighbor, path + [neighbor], tentative_g_score))
+        
+        return [], float('inf')
+    
+    def best_first_search(self, start: str, goal: str):
+        """
+        Best First Search Algorithm
+        Prioritizes speed over optimality (uses only heuristic)
+        """
+        import heapq
+        import time
+        
+        start_time = time.time()
+        nodes_expanded = 0
+        
+        # Priority queue: (heuristic, current_node, path, cost)
+        open_set = [(self.graph.heuristic(start, goal), start, [start], 0)]
+        visited = set()
+        
+        while open_set:
+            _, current, path, cost = heapq.heappop(open_set)
+            nodes_expanded += 1
+            
+            if current == goal:
+                end_time = time.time()
+                self.performance_stats = {
+                    'nodes_expanded': nodes_expanded,
+                    'execution_time': (end_time - start_time) * 1000,
+                    'path_cost': cost
+                }
+                return path, cost
+            
+            if current in visited:
+                continue
+            visited.add(current)
+            
+            for neighbor, edge_cost in self.graph.get_neighbors(current).items():
+                if neighbor not in visited:
+                    h_score = self.graph.heuristic(neighbor, goal)
+                    heapq.heappush(open_set, (h_score, neighbor, path + [neighbor], cost + edge_cost))
+        
+        return [], float('inf')
+    
+    def compare_algorithms(self, start: str, goal: str):
+        """Compare A* and Best First Search performance"""
+        results = {}
+        
+        # A* Search
+        path_a, cost_a = self.a_star_search(start, goal)
+        stats_a = self.performance_stats.copy()
+        results['a_star'] = {
+            'path': path_a,
+            'cost': cost_a,
+            'nodes_expanded': stats_a['nodes_expanded'],
+            'time_ms': stats_a['execution_time']
+        }
+        
+        # Best First Search
+        path_bf, cost_bf = self.best_first_search(start, goal)
+        stats_bf = self.performance_stats.copy()
+        results['best_first'] = {
+            'path': path_bf,
+            'cost': cost_bf,
+            'nodes_expanded': stats_bf['nodes_expanded'],
+            'time_ms': stats_bf['execution_time']
+        }
+        
+        return results
+
+
+def create_sample_graph():
+    """Create a sample city map graph for demonstration"""
+    g = Graph()
+    
+    # Add nodes (locations with coordinates)
+    nodes = {
+        'A': (0, 0),      # Start/Home
+        'B': (2, 1),      # Market
+        'C': (4, 2),      # School
+        'D': (1, 3),      # Hospital
+        'E': (3, 4),      # Park
+        'F': (5, 3),      # Mall
+        'G': (6, 5),      # Office/Goal
+        'H': (2, 5),      # Library
+        'I': (4, 1),      # Gym
+        'J': (7, 4),      # Stadium
+    }
+    
+    for node, coords in nodes.items():
+        g.add_node(node, coords[0], coords[1])
+    
+    # Add edges (roads with distances in km)
+    edges = [
+        ('A', 'B', 3.5),
+        ('A', 'D', 4.2),
+        ('B', 'C', 2.8),
+        ('B', 'E', 3.0),
+        ('B', 'I', 2.5),
+        ('C', 'F', 2.5),
+        ('C', 'G', 5.0),
+        ('D', 'E', 2.0),
+        ('E', 'F', 3.2),
+        ('E', 'G', 4.5),
+        ('E', 'H', 2.8),
+        ('F', 'G', 2.0),
+        ('F', 'J', 3.5),
+        ('G', 'J', 2.8),
+        ('H', 'G', 3.0),
+        ('I', 'C', 2.0),
+    ]
+    
+    for u, v, w in edges:
+        g.add_edge(u, v, w)
+    
+    return g
+
+
+def parse_route_query(query: str):
+    """Parse route query to extract start and goal locations"""
+    query_lower = query.lower()
+    
+    # Default values
+    start = None
+    goal = None
+    
+    # Location mapping
+    location_map = {
+        'home': 'A', 'house': 'A', 'start': 'A',
+        'market': 'B', 'mall': 'F',
+        'school': 'C', 'college': 'C', 'university': 'C',
+        'hospital': 'D', 'clinic': 'D',
+        'park': 'E', 'garden': 'E',
+        'office': 'G', 'work': 'G', 'company': 'G',
+        'library': 'H', 'books': 'H',
+        'gym': 'I', 'fitness': 'I',
+        'stadium': 'J', 'sports': 'J'
+    }
+    
+    # Try to extract from "from X to Y" pattern
+    from_match = re.search(r'from\s+([A-Za-z]+)', query_lower)
+    to_match = re.search(r'to\s+([A-Za-z]+)', query_lower)
+    
+    if from_match:
+        from_word = from_match.group(1)
+        if from_word in location_map:
+            start = location_map[from_word]
+        elif len(from_word) == 1 and from_word.upper() in 'ABCDEFGHIJ':
+            start = from_word.upper()
+    
+    if to_match:
+        to_word = to_match.group(1)
+        if to_word in location_map:
+            goal = location_map[to_word]
+        elif len(to_word) == 1 and to_word.upper() in 'ABCDEFGHIJ':
+            goal = to_word.upper()
+    
+    # Set defaults if still not found
+    start = start or 'A'
+    goal = goal or 'G'
+    
+    return start, goal
+
+
+def get_route_response(start: str, goal: str):
+    """Generate route response for given start and goal"""
+    graph = create_sample_graph()
+    finder = RouteFinder(graph)
+    
+    # Location mapping for display names
+    location_names = {
+        'A': 'Home', 'B': 'Market', 'C': 'School', 'D': 'Hospital',
+        'E': 'Park', 'F': 'Mall', 'G': 'Office', 'H': 'Library',
+        'I': 'Gym', 'J': 'Stadium'
+    }
+    
+    start_name = location_names.get(start, start)
+    goal_name = location_names.get(goal, goal)
+    
+    results = finder.compare_algorithms(start, goal)
+    
+    # Build formatted response
+    response = "🗺️ **Intelligent Route Finder**\n"
+    response += "=" * 50 + "\n\n"
+    
+    response += f"📍 **Route from {start_name} to {goal_name}**\n\n"
+    
+    # A* Search Results
+    if results['a_star']['path']:
+        path_str = ' → '.join([location_names.get(n, n) for n in results['a_star']['path']])
+        response += "**🎯 A* Search (Optimal Path)**\n"
+        response += "─────────────────────────────────\n"
+        response += f"• Path: {path_str}\n"
+        response += f"• Total Distance: {results['a_star']['cost']:.2f} km\n"
+        response += f"• Nodes Explored: {results['a_star']['nodes_expanded']}\n"
+        response += f"• Computation Time: {results['a_star']['time_ms']:.2f} ms\n\n"
+    else:
+        response += "**🎯 A* Search:** No path found\n\n"
+    
+    # Best First Search Results
+    if results['best_first']['path']:
+        path_str = ' → '.join([location_names.get(n, n) for n in results['best_first']['path']])
+        response += "**⚡ Best First Search (Fast Path)**\n"
+        response += "─────────────────────────────────\n"
+        response += f"• Path: {path_str}\n"
+        response += f"• Total Distance: {results['best_first']['cost']:.2f} km\n"
+        response += f"• Nodes Explored: {results['best_first']['nodes_expanded']}\n"
+        response += f"• Computation Time: {results['best_first']['time_ms']:.2f} ms\n\n"
+    else:
+        response += "**⚡ Best First Search:** No path found\n\n"
+    
+    # Comparison Analysis
+    response += "**📊 Algorithm Comparison**\n"
+    response += "─────────────────────────────────\n"
+    
+    if results['a_star']['path'] and results['best_first']['path']:
+        if results['a_star']['cost'] < results['best_first']['cost']:
+            diff = results['best_first']['cost'] - results['a_star']['cost']
+            response += f"• ✅ A* Search found the SHORTER route ({diff:.2f} km shorter)\n"
+        else:
+            diff = results['a_star']['cost'] - results['best_first']['cost']
+            response += f"• ✅ Best First Search found the SHORTER route ({diff:.2f} km shorter)\n"
+        
+        if results['a_star']['time_ms'] < results['best_first']['time_ms']:
+            time_diff = results['best_first']['time_ms'] - results['a_star']['time_ms']
+            response += f"• ✅ A* Search was FASTER ({time_diff:.2f} ms)\n"
+        else:
+            time_diff = results['a_star']['time_ms'] - results['best_first']['time_ms']
+            response += f"• ✅ Best First Search was FASTER ({time_diff:.2f} ms)\n"
+    
+    # Heuristic Information
+    response += "\n**🧠 Heuristic Used**\n"
+    response += "─────────────────────────────────\n"
+    response += "• Euclidean distance (straight-line)\n"
+    response += "• Estimates remaining distance to goal\n"
+    response += "• Guides search toward target efficiently\n\n"
+    
+    # Industry Context
+    response += "**💡 Industry Applications**\n"
+    response += "─────────────────────────────────\n"
+    response += "• **Navigation Apps:** Google Maps, Apple Maps, Waze\n"
+    response += "• **Logistics:** Delivery route optimization\n"
+    response += "• **Cloud Computing:** Network traffic routing\n"
+    response += "• **Transportation:** Ride-sharing route planning\n\n"
+    
+    response += "**📍 Available Locations**\n"
+    response += "─────────────────────────────────\n"
+    response += "A = Home | B = Market | C = School | D = Hospital\n"
+    response += "E = Park | F = Mall | G = Office | H = Library\n"
+    response += "I = Gym | J = Stadium\n\n"
+    
+    response += "**💡 Try these queries:**\n"
+    response += "• 'Find route from A to G'\n"
+    response += "• 'Shortest path from home to office'\n"
+    response += "• 'Navigation from market to stadium'"
+    
+    return response
+
+
 class CollegeChatbot:
     def __init__(self):
         self.lemmatizer = WordNetLemmatizer()
@@ -31,7 +377,7 @@ class CollegeChatbot:
             print("Warning: spaCy model not found. Some features may be limited.")
             self.nlp = None
         
-        # Comprehensive knowledge base with proper formatting
+        # Comprehensive knowledge base with proper formatting including route finder
         self.knowledge_base = {
             'greeting': {
                 'patterns': [
@@ -39,11 +385,23 @@ class CollegeChatbot:
                     'namaste', 'hola', 'howdy', 'whats up', 'sup'
                 ],
                 'responses': [
-                    "Hello! Welcome to College Enquiry Chatbot. How can I help you today?",
-                    "Hi there! I'm here to answer all your college-related questions.",
-                    "Greetings! How can I assist you with your college enquiry?"
+                    "Hello! 👋 Welcome to College Enquiry Chatbot.\n\nI can help you with:\n• College admissions, courses, and fees\n• Placement records and companies\n• Library, hostel, and other facilities\n• **Route finding** with A* and Best First Search algorithms\n\nTry asking: 'Find route from home to office' or 'Shortest path from A to G'",
+                    "Hi there! 😊 I'm here to answer your college questions and help you find optimal routes using heuristic search algorithms like A* and Best First Search!",
+                    "Greetings! 🎓 How can I assist you today? You can ask about college admissions or try route finding queries like 'Find route from A to G'."
                 ],
                 'keywords': ['hi', 'hello', 'hey', 'greeting', 'namaste', 'howdy']
+            },
+            'route_finder': {
+                'patterns': [
+                    'route', 'path', 'find route', 'shortest path', 'navigation',
+                    'how to reach', 'distance between', 'from to', 'way to',
+                    'directions', 'reach', 'travel to', 'go to', 'find path',
+                    'optimal route', 'best route', 'fastest route', 'a*', 'astar',
+                    'best first', 'heuristic', 'pathfinding', 'location', 'map'
+                ],
+                'responses': [],  # Dynamic - handled in get_response
+                'keywords': ['route', 'path', 'from', 'to', 'distance', 'navigation', 
+                             'way', 'reach', 'travel', 'direction', 'location', 'map']
             },
             'admission_process': {
                 'patterns': [
@@ -66,560 +424,48 @@ class CollegeChatbot:
                 ],
                 'keywords': ['admission', 'apply', 'procedure', 'process', 'steps']
             },
-            'admission_dates': {
-                'patterns': [
-                    'admission dates', 'when does admission start', 'admission deadline', 
-                    'last date to apply', 'admission schedule', 'when can i apply',
-                    'application deadline', 'start date', 'important dates'
-                ],
-                'responses': [
-                    "📅 **Important Admission Dates 2026**\n\n"
-                    "• Application Start: **June 1, 2026**\n\n"
-                    "• Last Date to Apply: **July 15, 2026**\n\n"
-                    "• Entrance Test: **July 20, 2026**\n\n"
-                    "• Result Declaration: **July 30, 2026**\n\n"
-                    "• Counseling Starts: **August 5, 2026**\n\n"
-                    "• Classes Begin: **August 20, 2026**"
-                ],
-                'keywords': ['date', 'start', 'deadline', 'when', 'schedule', 'timeline']
-            },
-            'admission_eligibility': {
-                'patterns': [
-                    'eligibility', 'who can apply', 'qualification required', 'minimum marks',
-                    'eligibility criteria', 'requirements for admission', 'what are the requirements',
-                    'am i eligible', 'qualifications needed'
-                ],
-                'responses': [
-                    "🎯 **Eligibility Criteria**\n\n"
-                    "**For Undergraduate (UG) Courses:**\n"
-                    "• Minimum 50% marks in 10+2 (45% for reserved categories)\n"
-                    "• Students appearing for final exams can also apply\n\n"
-                    "**For Postgraduate (PG) Courses:**\n"
-                    "• Bachelor's degree with minimum 50% marks\n"
-                    "• Relevant undergraduate degree required for specialized programs\n\n"
-                    "**Note:** There is no upper age limit for any course."
-                ],
-                'keywords': ['eligibility', 'qualification', 'marks', 'eligible', 'requirements']
-            },
-            'library_timing': {
-                'patterns': [
-                    'library timing', 'library hours', 'when library opens', 'library closes',
-                    'library schedule', 'what time library open', 'library open time',
-                    'library close time', 'library working hours', 'timings of library'
-                ],
-                'responses': [
-                    "🕒 **Library Timings**\n\n"
-                    "• Monday to Friday: **8:00 AM to 8:00 PM**\n\n"
-                    "• Saturday: **9:00 AM to 5:00 PM**\n\n"
-                    "• Sunday: **Closed**\n\n"
-                    "• Public Holidays: **Closed**\n\n"
-                    "📌 **Note:** The digital library is accessible 24/7 through the student portal."
-                ],
-                'keywords': ['timing', 'hour', 'open', 'close', 'schedule', 'when']
-            },
-            'library_books': {
-                'patterns': [
-                    'library books', 'book collection', 'how many books', 'books available',
-                    'books in library', 'what books are there', 'book count',
-                    'number of books', 'book list', 'collection of books',
-                    'what books do you have'
-                ],
-                'responses': [
-                    "📚 **Library Collection**\n\n"
-                    "• **Total Books:** 75,000+ across all subjects\n\n"
-                    "• **National Journals:** 100+ subscriptions\n\n"
-                    "• **International Journals:** 50+ subscriptions\n\n"
-                    "• **E-Books:** 25,000+ digital titles\n\n"
-                    "• **Research Papers:** 50,000+ access\n\n"
-                    "• **Thesis & Dissertations:** 1,000+ student works\n\n"
-                    "• **Previous Year Papers:** Complete digital archive"
-                ],
-                'keywords': ['books', 'collection', 'journals', 'papers', 'thesis', 'archives']
-            },
-            'library_digital': {
-                'patterns': [
-                    'digital library', 'e-library', 'online resources', 'e-books', 'online journals',
-                    'digital resources', 'online books', 'internet library', 'virtual library',
-                    'online access', 'remote access', 'digital collection'
-                ],
-                'responses': [
-                    "💻 **Digital Library Resources**\n\n"
-                    "• **E-Books:** 25,000+ titles\n"
-                    "  - Springer, Elsevier, Wiley\n\n"
-                    "• **Online Courses:** Free access\n"
-                    "  - Coursera, Udemy, edX\n\n"
-                    "• **Research Databases:**\n"
-                    "  - IEEE, ACM, J-Gate, Scopus\n\n"
-                    "• **Previous Papers:** Digital archive of last 10 years\n\n"
-                    "• **Remote Access:** Available 24/7 from anywhere\n\n"
-                    "• **Mobile App:** Access library on your smartphone"
-                ],
-                'keywords': ['digital', 'online', 'ebook', 'elibrary', 'virtual', 'remote']
-            },
-            'courses_bca': {
-                'patterns': [
-                    'bca', 'bachelor of computer applications', 'computer applications course',
-                    'tell me about bca', 'bca details', 'bca information', 'bca program',
-                    'what is bca', 'bca course', 'about bca'
-                ],
-                'responses': [
-                    "💻 **BCA (Bachelor of Computer Applications)**\n\n"
-                    "**📊 Program Overview**\n"
-                    "• Duration: **3 years** (6 semesters)\n"
-                    "• Intake Capacity: **120 students**\n"
-                    "• Annual Fees: **₹45,000**\n\n"
-                    "**📚 Core Subjects**\n"
-                    "• Programming Languages: C, C++, Java, Python\n"
-                    "• Database Management Systems\n"
-                    "• Web Development\n"
-                    "• Computer Networks\n"
-                    "• Operating Systems\n"
-                    "• Software Engineering\n\n"
-                    "**💼 Career Options**\n"
-                    "• Software Developer\n"
-                    "• Web Designer\n"
-                    "• System Analyst\n"
-                    "• Database Administrator\n"
-                    "• IT Consultant"
-                ],
-                'keywords': ['bca', 'computer applications']
-            },
-            'courses_mca': {
-                'patterns': [
-                    'mca', 'master of computer applications', 'mca details', 'mca information',
-                    'tell me about mca', 'what is mca', 'mca program', 'mca course'
-                ],
-                'responses': [
-                    "🎓 **MCA (Master of Computer Applications)**\n\n"
-                    "**📊 Program Overview**\n"
-                    "• Duration: **2 years** (4 semesters)\n"
-                    "• Intake Capacity: **60 students**\n"
-                    "• Annual Fees: **₹60,000**\n"
-                    "• Eligibility: BCA or B.Sc CS with Mathematics\n\n"
-                    "**📚 Advanced Subjects**\n"
-                    "• Advanced Java Programming\n"
-                    "• Machine Learning\n"
-                    "• Cloud Computing\n"
-                    "• Cyber Security\n"
-                    "• Big Data Analytics\n"
-                    "• Mobile App Development\n\n"
-                    "**💼 Career Options**\n"
-                    "• Software Architect\n"
-                    "• IT Consultant\n"
-                    "• Project Manager\n"
-                    "• Senior Developer\n"
-                    "• Technical Lead"
-                ],
-                'keywords': ['mca', 'master of computer applications']
-            },
-            'courses_mba': {
-                'patterns': [
-                    'mba', 'master of business administration', 'mba details', 'mba information',
-                    'tell me about mba', 'what is mba', 'mba program', 'mba course',
-                    'business administration'
-                ],
-                'responses': [
-                    "📊 **MBA (Master of Business Administration)**\n\n"
-                    "**📊 Program Overview**\n"
-                    "• Duration: **2 years** (4 semesters)\n"
-                    "• Intake Capacity: **60 students**\n"
-                    "• Annual Fees: **₹80,000**\n"
-                    "• Eligibility: Any graduate with 50% marks\n\n"
-                    "**🎯 Specializations**\n"
-                    "• Marketing Management\n"
-                    "• Finance Management\n"
-                    "• Human Resources\n"
-                    "• Operations Management\n"
-                    "• Business Analytics\n\n"
-                    "**💼 Career Options**\n"
-                    "• Business Analyst\n"
-                    "• Marketing Manager\n"
-                    "• HR Manager\n"
-                    "• Financial Analyst\n"
-                    "• Operations Manager"
-                ],
-                'keywords': ['mba', 'business administration']
-            },
-            'fees_bca': {
-                'patterns': [
-                    'bca fee', 'bca fees', 'bca cost', 'bca payment', 'how much is bca',
-                    'bca course fee', 'bca expenses', 'bca total fee', 'fee for bca'
-                ],
-                'responses': [
-                    "💰 **BCA Fee Structure (per year)**\n\n"
-                    "**Breakdown:**\n"
-                    "• Tuition Fee: ₹45,000\n"
-                    "• Laboratory Fee: ₹5,000\n"
-                    "• Library Fee: ₹3,000\n"
-                    "• Sports Fee: ₹2,000\n"
-                    "• Examination Fee: ₹5,000\n\n"
-                    "**Total: ₹60,000 per year**\n\n"
-                    "**Hostel Fee (optional):** ₹70,000 per year (includes mess)\n\n"
-                    "**Payment Options:**\n"
-                    "• One-time annual payment (5% discount)\n"
-                    "• Semester-wise (50% each semester)\n"
-                    "• Monthly installments (with nominal interest)"
-                ],
-                'keywords': ['bca fee', 'bca cost', 'bca payment']
-            },
-            'fees_mca': {
-                'patterns': [
-                    'mca fee', 'mca fees', 'mca cost', 'mca payment', 'how much is mca',
-                    'mca course fee', 'mca expenses', 'fee for mca'
-                ],
-                'responses': [
-                    "💰 **MCA Fee Structure (per year)**\n\n"
-                    "**Breakdown:**\n"
-                    "• Tuition Fee: ₹60,000\n"
-                    "• Laboratory Fee: ₹7,000\n"
-                    "• Library Fee: ₹3,000\n"
-                    "• Sports Fee: ₹2,000\n"
-                    "• Examination Fee: ₹6,000\n\n"
-                    "**Total: ₹78,000 per year**\n\n"
-                    "**Hostel Fee (optional):** ₹70,000 per year (includes mess)"
-                ],
-                'keywords': ['mca fee', 'mca cost', 'mca payment']
-            },
-            'fees_mba': {
-                'patterns': [
-                    'mba fee', 'mba fees', 'mba cost', 'mba payment', 'how much is mba',
-                    'mba course fee', 'mba expenses', 'fee for mba'
-                ],
-                'responses': [
-                    "💰 **MBA Fee Structure (per year)**\n\n"
-                    "**Breakdown:**\n"
-                    "• Tuition Fee: ₹80,000\n"
-                    "• Library Fee: ₹5,000\n"
-                    "• Sports Fee: ₹2,000\n"
-                    "• Examination Fee: ₹8,000\n\n"
-                    "**Total: ₹95,000 per year**\n\n"
-                    "**Hostel Fee (optional):** ₹70,000 per year (includes mess)"
-                ],
-                'keywords': ['mba fee', 'mba cost', 'mba payment']
-            },
-            'fees_general': {
-                'patterns': [
-                    'fees', 'fee structure', 'course fees', 'how much does it cost', 'payment',
-                    'college fees', 'tuition fee', 'total fee', 'what is the fee',
-                    'fee details', 'cost of courses'
-                ],
-                'responses': [
-                    "💰 **Course-wise Fee Range (per year)**\n\n"
-                    "• **BCA:** ₹45,000 - ₹60,000\n"
-                    "• **B.Sc Computer Science:** ₹40,000 - ₹55,000\n"
-                    "• **B.Com:** ₹35,000 - ₹50,000\n"
-                    "• **MCA:** ₹60,000 - ₹78,000\n"
-                    "• **MBA:** ₹80,000 - ₹95,000\n\n"
-                    "💡 **For specific course fees, ask:**\n"
-                    "• \"BCA fees\"\n"
-                    "• \"MBA fee structure\"\n"
-                    "• \"How much does MCA cost\""
-                ],
-                'keywords': ['fee', 'fees', 'cost', 'payment', 'expense', 'tuition']
-            },
-            'placement_stats': {
-                'patterns': [
-                    'placement statistics', 'placement record', 'placement data', 'placement history',
-                    'placement report', 'placement details', 'tell me about placements',
-                    'how is placement', 'placement scenario', 'placement percentage'
-                ],
-                'responses': [
-                    "📊 **Placement Statistics 2025**\n\n"
-                    "**Key Metrics:**\n"
-                    "• Total Students Placed: **450+**\n"
-                    "• Placement Percentage: **92%**\n"
-                    "• Average Package: **₹7.2 LPA**\n"
-                    "• Highest Package: **₹25 LPA** (International)\n"
-                    "• Students with Multiple Offers: **120+**\n"
-                    "• International Offers: **15**\n\n"
-                    "**Top Recruiters:**\n"
-                    "• TCS, Infosys, Wipro\n"
-                    "• Accenture, Amazon, Microsoft\n"
-                    "• Deloitte, PwC, KPMG"
-                ],
-                'keywords': ['placement', 'statistics', 'record', 'data', 'report', 'percentage']
-            },
-            'placement_companies': {
-                'patterns': [
-                    'which companies', 'recruiters', 'top companies', 'visiting companies',
-                    'companies visiting', 'recruitment companies', 'placement companies',
-                    'who visits', 'list of companies', 'company names'
-                ],
-                'responses': [
-                    "🏢 **Top Recruiting Companies**\n\n"
-                    "**IT & Software:**\n"
-                    "• TCS\n"
-                    "• Infosys\n"
-                    "• Wipro\n"
-                    "• HCL\n"
-                    "• Tech Mahindra\n"
-                    "• Cognizant\n\n"
-                    "**Tech Giants:**\n"
-                    "• Microsoft\n"
-                    "• Google\n"
-                    "• Amazon\n"
-                    "• Adobe\n\n"
-                    "**Consulting Firms:**\n"
-                    "• Accenture\n"
-                    "• Deloitte\n"
-                    "• PwC\n"
-                    "• KPMG\n\n"
-                    "**Banking & Finance:**\n"
-                    "• HDFC Bank\n"
-                    "• ICICI Bank\n"
-                    "• Axis Bank"
-                ],
-                'keywords': ['companies', 'recruiters', 'visiting', 'recruitment']
-            },
-            'placement_package': {
-                'patterns': [
-                    'average package', 'average salary', 'highest package', 'salary range',
-                    'salary package', 'how much salary', 'package details', 'compensation',
-                    'what is the average', 'what is the highest', 'salary offered'
-                ],
-                'responses': [
-                    "💰 **Placement Package Details 2025**\n\n"
-                    "**Overall Packages:**\n"
-                    "• **Average Package:** ₹7.2 LPA\n"
-                    "• **Median Package:** ₹6.5 LPA\n"
-                    "• **Highest Package:** ₹25 LPA (International)\n"
-                    "• **Minimum Package:** ₹3.5 LPA\n\n"
-                    "**Top Performer Packages:**\n"
-                    "• Top 10% Students: **₹15+ LPA**\n"
-                    "• Top 25% Students: **₹10+ LPA**\n\n"
-                    "**Branch-wise Average:**\n"
-                    "• CSE/IT: ₹8.5 LPA\n"
-                    "• MBA: ₹7.8 LPA\n"
-                    "• MCA: ₹6.5 LPA\n"
-                    "• BCA: ₹5.2 LPA"
-                ],
-                'keywords': ['package', 'salary', 'average', 'highest', 'ctc', 'lpa']
-            },
             'hostel_general': {
                 'patterns': [
                     'hostel', 'accommodation', 'hostel facility', 'dormitory',
-                    'hostel details', 'tell me about hostel', 'hostel information',
-                    'where to stay', 'living facilities', 'campus accommodation'
+                    'hostel details', 'tell me about hostel', 'hostel information'
                 ],
                 'responses': [
-                    "🏠 **Hostel Facilities Overview**\n\n"
-                    "**Facilities:**\n"
-                    "• Separate hostels for Boys and Girls\n"
-                    "• Total Capacity: **900 students**\n"
-                    "  - Boys: 500 students\n"
-                    "  - Girls: 400 students\n\n"
-                    "**Room Options:**\n"
-                    "• Single occupancy\n"
-                    "• Double sharing\n"
-                    "• Triple sharing\n\n"
-                    "**Annual Fee:** ₹70,000 (includes mess)\n\n"
-                    "**Amenities:**\n"
-                    "• High-speed Wi-Fi\n"
-                    "• Modern gymnasium\n"
-                    "• Common room with TV\n"
-                    "• Laundry service\n"
-                    "• 24/7 security with CCTV\n"
-                    "• Biometric entry system\n\n"
-                    "💡 **For specific details, ask:**\n"
-                    "• \"Boys hostel\"\n"
-                    "• \"Girls hostel\"\n"
-                    "• \"Mess facilities\""
+                    "🏠 **Hostel Facilities**\n\n"
+                    "• Separate hostels for Boys (500) and Girls (400)\n"
+                    "• Room Types: Single, Double, Triple sharing\n"
+                    "• Annual Fee: ₹70,000 (includes mess)\n\n"
+                    "**Amenities:** Wi-Fi, Gym, Common Room, Laundry, 24/7 Security"
                 ],
-                'keywords': ['hostel', 'accommodation', 'dorm', 'stay', 'living']
+                'keywords': ['hostel', 'accommodation', 'dorm', 'stay']
             },
-            'hostel_boys': {
+            'placement_stats': {
                 'patterns': [
-                    'boys hostel', 'hostel for boys', 'boys accommodation',
-                    'where do boys stay', 'boys living', 'hostel for male'
+                    'placement statistics', 'placement record', 'placement data',
+                    'tell me about placements', 'how is placement'
                 ],
                 'responses': [
-                    "👨 **Boys Hostel Details**\n\n"
-                    "**Blocks:** 5 (A, B, C, D, E)\n"
-                    "**Total Capacity:** 500 students\n\n"
-                    "**Room Fees (per year):**\n"
-                    "• Single Room: ₹80,000\n"
-                    "• Double Sharing: ₹70,000\n"
-                    "• Triple Sharing: ₹60,000\n\n"
-                    "**Amenities:**\n"
-                    "• High-speed Wi-Fi\n"
-                    "• Fully equipped gym\n"
-                    "• TV and recreation room\n"
-                    "• Table tennis and indoor games\n"
-                    "• Laundry service\n\n"
-                    "**Location:** North Campus, near academic blocks"
+                    "📊 **Placement Statistics 2025**\n\n"
+                    "• Placement Rate: **92%**\n"
+                    "• Average Package: **₹7.2 LPA**\n"
+                    "• Highest Package: **₹25 LPA**\n"
+                    "• Students Placed: **450+**\n\n"
+                    "**Top Recruiters:** TCS, Infosys, Wipro, Accenture, Amazon, Microsoft"
                 ],
-                'keywords': ['boys hostel', 'boys accommodation']
-            },
-            'hostel_girls': {
-                'patterns': [
-                    'girls hostel', 'hostel for girls', 'girls accommodation',
-                    'where do girls stay', 'girls living', 'ladies hostel',
-                    'hostel for female'
-                ],
-                'responses': [
-                    "👩 **Girls Hostel Details**\n\n"
-                    "**Blocks:** 4 (G1, G2, G3, G4)\n"
-                    "**Total Capacity:** 400 students\n\n"
-                    "**Room Fees (per year):**\n"
-                    "• Single Room: ₹80,000\n"
-                    "• Double Sharing: ₹70,000\n"
-                    "• Triple Sharing: ₹60,000\n\n"
-                    "**Amenities:**\n"
-                    "• High-speed Wi-Fi\n"
-                    "• Gym and yoga room\n"
-                    "• Common room with TV\n"
-                    "• Indoor games\n"
-                    "• Laundry service\n\n"
-                    "**Safety Features:**\n"
-                    "• Female wardens\n"
-                    "• 24/7 CCTV surveillance\n"
-                    "• Security guards\n"
-                    "• Biometric entry\n\n"
-                    "**Location:** South Campus, near library"
-                ],
-                'keywords': ['girls hostel', 'girls accommodation', 'ladies hostel']
-            },
-            'mess': {
-                'patterns': [
-                    'mess', 'food', 'canteen', 'dining', 'food facility',
-                    'mess food', 'canteen food', 'dining hall', 'what food',
-                    'meal', 'breakfast', 'lunch', 'dinner'
-                ],
-                'responses': [
-                    "🍽️ **Mess and Dining Facilities**\n\n"
-                    "**Menu Options:**\n"
-                    "• North Indian cuisine\n"
-                    "• South Indian cuisine\n"
-                    "• Chinese cuisine\n"
-                    "• Jain food available on request\n\n"
-                    "**Meal Timings:**\n"
-                    "• **Breakfast:** 7:30 AM to 9:00 AM\n"
-                    "• **Lunch:** 12:00 PM to 2:00 PM\n"
-                    "• **Dinner:** 7:00 PM to 9:00 PM\n\n"
-                    "**Options:**\n"
-                    "• Vegetarian and Non-vegetarian available\n"
-                    "• Separate counters for both\n\n"
-                    "**Monthly Fee:** Included in hostel fees\n"
-                    "**Canteen:** Open 8 AM to 10 PM for snacks and beverages"
-                ],
-                'keywords': ['mess', 'food', 'canteen', 'dining', 'meal']
-            },
-            'sports': {
-                'patterns': [
-                    'sports', 'games', 'sports facility', 'cricket', 'football', 'basketball',
-                    'sports ground', 'gym', 'fitness', 'sports complex', 'athletics'
-                ],
-                'responses': [
-                    "⚽ **Sports Facilities**\n\n"
-                    "**Outdoor Facilities:**\n"
-                    "• Cricket ground with practice nets\n"
-                    "• Football field (FIFA standard)\n"
-                    "• Basketball court (2 courts)\n"
-                    "• Volleyball court\n"
-                    "• Tennis court\n"
-                    "• 400m athletics track\n\n"
-                    "**Indoor Facilities:**\n"
-                    "• Badminton courts\n"
-                    "• Table tennis\n"
-                    "• Chess and carrom\n"
-                    "• Modern gymnasium\n\n"
-                    "**Timings:** 6:00 AM to 8:00 PM\n"
-                    "**Professional coaches** available for all sports\n\n"
-                    "**Achievements:** State champions in Cricket, Basketball, and Athletics"
-                ],
-                'keywords': ['sports', 'games', 'cricket', 'football', 'basketball', 'gym']
-            },
-            'transport': {
-                'patterns': [
-                    'transport', 'bus', 'shuttle', 'conveyance', 'college bus',
-                    'bus facility', 'transportation', 'how to reach', 'commute'
-                ],
-                'responses': [
-                    "🚌 **College Transport Facilities**\n\n"
-                    "**Fleet:** 15 college buses covering major routes\n"
-                    "**Routes:** 12 routes across the city\n\n"
-                    "**Timings:**\n"
-                    "• First bus: 7:00 AM\n"
-                    "• Last bus: 6:00 PM\n\n"
-                    "**Fees:**\n"
-                    "• Annual: ₹15,000\n"
-                    "• Monthly Pass: ₹1,500\n\n"
-                    "**Features:**\n"
-                    "• GPS tracking on all buses\n"
-                    "• Female attendants on all buses\n"
-                    "• Live tracking on student app\n"
-                    "• Pickup and drop at designated stops"
-                ],
-                'keywords': ['transport', 'bus', 'shuttle', 'conveyance', 'commute']
-            },
-            'scholarship': {
-                'patterns': [
-                    'scholarship', 'financial aid', 'fee concession', 'financial assistance',
-                    'education loan', 'scholarship opportunities', 'aid'
-                ],
-                'responses': [
-                    "🎓 **Scholarship Opportunities**\n\n"
-                    "**1. Merit-Based Scholarship**\n"
-                    "• 90% and above: **100%** tuition fee waiver\n"
-                    "• 85-89%: **50%** tuition fee waiver\n"
-                    "• 80-84%: **25%** tuition fee waiver\n\n"
-                    "**2. Need-Based Financial Aid**\n"
-                    "• Up to ₹50,000 per year based on family income\n"
-                    "• Requires income certificate and documents\n\n"
-                    "**3. Sports Quota Scholarship**\n"
-                    "• 30% fee concession for state/national level players\n\n"
-                    "**4. Government Scholarships**\n"
-                    "• SC/ST/OBC scholarships as per government norms\n"
-                    "• Minority scholarship schemes\n\n"
-                    "**Application Deadline:** August 31st annually"
-                ],
-                'keywords': ['scholarship', 'financial aid', 'concession', 'assistance']
+                'keywords': ['placement', 'statistics', 'record']
             },
             'contact': {
                 'patterns': [
-                    'contact', 'phone', 'email', 'address', 'reach', 'call', 'contact number',
-                    'phone number', 'email id', 'college address', 'where is college',
-                    'how to contact', 'get in touch', 'location'
+                    'contact', 'phone', 'email', 'address', 'reach', 'call',
+                    'phone number', 'college address'
                 ],
                 'responses': [
                     "📞 **Contact Information**\n\n"
-                    "**Admission Office:** +91 98765 43210\n"
-                    "**General Enquiry:** +91 98765 43211\n"
-                    "**Email:** info@college.edu\n"
-                    "**Website:** www.college.edu\n\n"
-                    "**College Address:**\n"
-                    "College Road, Education City\n"
-                    "State - 400001, India\n\n"
-                    "**Office Hours:**\n"
-                    "• Monday to Friday: 9:00 AM to 5:00 PM\n"
-                    "• Saturday: 9:00 AM to 1:00 PM\n"
-                    "• Sunday: Closed"
+                    "• Admission: +91 98765 43210\n"
+                    "• General: +91 98765 43211\n"
+                    "• Email: info@college.edu\n\n"
+                    "**Address:** College Road, Education City, State - 400001"
                 ],
-                'keywords': ['contact', 'phone', 'email', 'address', 'call', 'reach', 'location']
-            },
-            'about': {
-                'patterns': [
-                    'about college', 'college information', 'tell me about college',
-                    'college details', 'about this college', 'college overview'
-                ],
-                'responses': [
-                    "🏛️ **About Our College**\n\n"
-                    "**Establishment:** 1995\n"
-                    "**Campus Size:** 50 acres\n"
-                    "**Total Students:** 3,500+\n"
-                    "**Faculty:** 200+ qualified teachers\n"
-                    "**Courses:** UG, PG, and Doctoral programs\n\n"
-                    "**Accreditations:**\n"
-                    "• UGC approved\n"
-                    "• AICTE recognized\n"
-                    "• NAAC A+ grade\n"
-                    "• ISO 9001:2015 certified\n\n"
-                    "**Rankings:**\n"
-                    "• Ranked among top 50 colleges in India\n"
-                    "• Best Emerging College Award 2024\n\n"
-                    "**Vision:** To be a center of excellence in education, research, and innovation"
-                ],
-                'keywords': ['about', 'college information', 'overview', 'details']
+                'keywords': ['contact', 'phone', 'email', 'address', 'call']
             }
         }
     
@@ -635,9 +481,7 @@ class CollegeChatbot:
         courses = {
             'bca': ['bca', 'bachelor of computer applications'],
             'mca': ['mca', 'master of computer applications'],
-            'mba': ['mba', 'master of business administration'],
-            'bsc': ['bsc', 'bachelor of science'],
-            'bcom': ['bcom', 'bachelor of commerce']
+            'mba': ['mba', 'master of business administration']
         }
         
         text_lower = text.lower()
@@ -659,38 +503,54 @@ class CollegeChatbot:
         for intent, data in self.knowledge_base.items():
             score = 0
             
-            # 1. Pattern Matching (High Weight)
+            # Pattern matching
             for pattern in data['patterns']:
                 if pattern in query_lower:
-                    score += 5  # Increased weight for exact pattern match
+                    score += 5
                 else:
-                    # Fuzzy match for pattern
                     match_ratio = SequenceMatcher(None, pattern, query_lower).ratio()
                     if match_ratio > 0.7:
                         score += 3 * match_ratio
             
-            # 2. Keyword Matching
+            # Keyword matching
             for keyword in data['keywords']:
                 if keyword in query_lower:
                     score += 2
                 elif any(SequenceMatcher(None, keyword, word).ratio() > 0.8 for word in query_words):
                     score += 1.5
             
-            # 3. Contextual word overlap
-            common_words = query_words.intersection(set(word_tokenize(" ".join(data['patterns']))))
-            score += len(common_words) * 0.5
-            
             if score > best_score:
                 best_score = score
                 best_intent = intent
         
-        # Normalize score
         confidence = min(best_score / 6, 1.0)
         return best_intent, confidence
     
     def get_response(self, query, user_id=None):
         """Main method to get chatbot response"""
         start_time = time.time()
+        
+        # Check if it's a route finding query FIRST
+        route_keywords = ['route', 'path', 'navigation', 'from', 'to', 'distance', 
+                          'shortest', 'way', 'reach', 'directions', 'travel',
+                          'a*', 'astar', 'heuristic', 'pathfinding', 'location', 'map']
+        
+        if any(keyword in query.lower() for keyword in route_keywords):
+            # Parse start and goal from query
+            start, goal = parse_route_query(query)
+            
+            # Generate route response
+            route_response = get_route_response(start, goal)
+            
+            return {
+                'response': route_response,
+                'intent': 'route_finder',
+                'confidence': 0.95,
+                'sentiment': 'neutral',
+                'sentiment_score': 0,
+                'entities': {'start': start, 'goal': goal, 'query_type': 'route_finding'},
+                'response_time': round(time.time() - start_time, 3)
+            }
         
         # Extract course if mentioned
         course = self.extract_course(query)
@@ -712,11 +572,9 @@ class CollegeChatbot:
                 "• Admission process, dates, and eligibility\n"
                 "• Course details (BCA, MCA, MBA)\n"
                 "• Fee structure\n"
-                "• Placement records and companies\n"
-                "• Library facilities\n"
-                "• Hostel accommodation\n"
-                "• Sports and transport facilities\n"
-                "• Scholarships and financial aid"
+                "• Placement records\n"
+                "• Hostel facilities\n"
+                "• **Route finding** (e.g., 'Find route from A to G' or 'How to reach home from office')"
             )
         else:
             response = self.knowledge_base[intent]['responses'][0]
