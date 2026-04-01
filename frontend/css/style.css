@@ -915,3 +915,53 @@ body.dark-mode {
         break-inside: avoid;
     }
 }
+
+/* Better message formatting */
+.message-text {
+    line-height: 1.6;
+    white-space: normal;
+    word-wrap: break-word;
+}
+
+.message-text br {
+    display: block;
+    margin: 8px 0;
+    content: "";
+}
+
+.message-text strong {
+    color: #4361ee;
+    font-weight: 600;
+}
+
+.message.user .message-text strong {
+    color: white;
+}
+
+/* Bullet point styling */
+.message-text {
+    padding: 0;
+}
+
+.message-text br + br {
+    margin-top: 12px;
+}
+
+/* Indent bullet points */
+.message-text {
+    margin-left: 0;
+}
+
+/* Numbered list styling */
+.message-text {
+    line-height: 1.6;
+}
+
+/* Dark mode adjustments */
+.dark-mode .message-text {
+    color: #e0e0e0;
+}
+
+.dark-mode .message-text strong {
+    color: #4cc9f0;
+}
