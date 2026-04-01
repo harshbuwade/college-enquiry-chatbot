@@ -1,22 +1,21 @@
+"""
+download_nltk.py
+Run once to download all required NLTK corpora.
+Usage: python download_nltk.py
+"""
 import nltk
-import ssl
-import os
 
-# Disable SSL verification for downloading (if needed)
-try:
-    _create_unverified_https_context = ssl._create_unverified_context
-except AttributeError:
-    pass
-else:
-    ssl._create_default_https_context = _create_unverified_https_context
+packages = [
+    'punkt',
+    'punkt_tab',
+    'stopwords',
+    'wordnet',
+    'averaged_perceptron_tagger',
+    'omw-1.4',
+]
 
-print("Downloading NLTK data...")
+print('Downloading NLTK data...')
+for pkg in packages:
+    nltk.download(pkg, quiet=False)
 
-# Download required NLTK data
-nltk.download('punkt')
-nltk.download('punkt_tab')  # This is the missing one causing the 500 error!
-nltk.download('stopwords')
-nltk.download('wordnet')
-nltk.download('averaged_perceptron_tagger')
-
-print("NLTK data downloaded successfully!")
+print('\n✅ All NLTK data downloaded successfully.')

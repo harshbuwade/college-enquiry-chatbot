@@ -3,70 +3,174 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>College Enquiry Chatbot</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <title>College Enquiry Chatbot – AI Assistant</title>
+    <meta name="description" content="AI-powered college enquiry chatbot with intelligent route finder using A* and Best First Search algorithms.">
+    <meta name="keywords" content="college chatbot, admission, courses, fees, placement, route finder, A*, AI">
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-    <div class="container">
-        <div class="chat-container">
-            <div class="chat-header">
+
+<div class="app-wrapper">
+
+    <!-- ══ SIDEBAR ═══════════════════════════════════════════════════════════ -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">
+                <div class="logo-icon"><i class="fas fa-graduation-cap"></i></div>
+                <div class="logo-text">
+                    <span class="logo-title">EduBot</span>
+                    <span class="logo-sub">College AI Assistant</span>
+                </div>
+            </div>
+            <button class="sidebar-close" id="sidebarClose"><i class="fas fa-times"></i></button>
+        </div>
+
+        <div class="sidebar-nav">
+            <p class="nav-label">Quick Topics</p>
+            <button class="nav-item active" data-query="Hello">
+                <i class="fas fa-home"></i><span>Home</span>
+            </button>
+            <button class="nav-item" data-query="Tell me about the admission process">
+                <i class="fas fa-file-alt"></i><span>Admissions</span>
+            </button>
+            <button class="nav-item" data-query="What courses do you offer?">
+                <i class="fas fa-book-open"></i><span>Courses</span>
+            </button>
+            <button class="nav-item" data-query="What is the fee structure?">
+                <i class="fas fa-rupee-sign"></i><span>Fees</span>
+            </button>
+            <button class="nav-item" data-query="Tell me about placements">
+                <i class="fas fa-briefcase"></i><span>Placements</span>
+            </button>
+            <button class="nav-item" data-query="Tell me about hostel facilities">
+                <i class="fas fa-building"></i><span>Hostel</span>
+            </button>
+            <button class="nav-item" data-query="Tell me about library">
+                <i class="fas fa-book"></i><span>Library</span>
+            </button>
+            <button class="nav-item" data-query="Tell me about scholarships">
+                <i class="fas fa-medal"></i><span>Scholarships</span>
+            </button>
+            <button class="nav-item" data-query="Find route from Home to Office">
+                <i class="fas fa-route"></i><span>Route Finder</span>
+            </button>
+            <button class="nav-item" data-query="What is the contact information?">
+                <i class="fas fa-phone"></i><span>Contact</span>
+            </button>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="status-indicator">
+                <span class="status-dot"></span>
+                <span id="statusText">Connected</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ══ MAIN CHAT ══════════════════════════════════════════════════════════ -->
+    <main class="chat-main">
+
+        <!-- Header -->
+        <header class="chat-header">
+            <div class="header-left">
+                <button class="hamburger" id="hamburgerBtn" aria-label="Open sidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <div class="header-title">
-                    <i class="fas fa-graduation-cap"></i>
-                    <h2>College Enquiry Chatbot</h2>
-                </div>
-                <div class="header-actions">
-                    <button id="themeToggle" class="icon-btn">
-                        <i class="fas fa-moon"></i>
-                    </button>
-                    <button id="clearChat" class="icon-btn">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="chat-messages" id="chatMessages">
-                <div class="message bot">
-                    <div class="avatar">
+                    <div class="bot-avatar-header">
                         <i class="fas fa-robot"></i>
+                        <span class="online-dot"></span>
                     </div>
-                    <div class="message-content">
-                        <p>Hello! 👋 Welcome to College Enquiry Chatbot. How can I help you today?</p>
-                        <div class="quick-questions">
-                            <button class="quick-question">Admission process</button>
-                            <button class="quick-question">Courses offered</button>
-                            <button class="quick-question">Fee structure</button>
-                            <button class="quick-question">Placement records</button>
-                            <button class="quick-question">Hostel facilities</button>
-                            <button class="quick-question">Library timings</button>
-                            <button class="quick-question">Find route from A to G</button>
-                        </div>
+                    <div>
+                        <h1>College Enquiry Chatbot</h1>
                     </div>
-                    <div class="message-time">Just now</div>
                 </div>
             </div>
-            
-            <div class="chat-input-area">
-                <div class="typing-indicator" id="typingIndicator">
-                    <span></span>
-                    <span></span>
-                    <span></span>
+            <div class="header-actions">
+                <button class="hdr-btn" id="historyBtn" title="Load history">
+                    <i class="fas fa-history"></i>
+                </button>
+                <button class="hdr-btn" id="themeToggle" title="Toggle dark mode">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button class="hdr-btn hdr-btn-danger" id="clearChat" title="Clear chat">
+                    <i class="fas fa-trash-alt"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Messages -->
+        <section class="chat-messages" id="chatMessages" role="log" aria-live="polite">
+
+            <!-- Welcome message -->
+            <div class="message bot" id="welcomeMsg">
+                <div class="avatar bot-av"><i class="fas fa-robot"></i></div>
+                <div class="message-bubble bot-bubble">
+                    <div class="bubble-content">
+                        <p>Hello! 👋 Welcome to <strong>College Enquiry Chatbot</strong>.</p>
+                        <p>I can help you with admissions, courses, fees, placements, hostel, library, and <strong>intelligent route finding</strong> using AI algorithms!</p>
+                        <p>What would you like to know today?</p>
+                    </div>
+                    <div class="quick-chips" id="quickChips">
+                        <button class="chip" data-query="Tell me about the admission process">📋 Admissions</button>
+                        <button class="chip" data-query="What courses do you offer?">📚 Courses</button>
+                        <button class="chip" data-query="What is the fee structure?">💰 Fees</button>
+                        <button class="chip" data-query="Tell me about placements">📊 Placements</button>
+                        <button class="chip" data-query="Tell me about hostel facilities">🏠 Hostel</button>
+                        <button class="chip" data-query="Find route from Home to Office">🗺️ Route Finder</button>
+                        <button class="chip" data-query="Tell me about scholarships">🏅 Scholarships</button>
+                        <button class="chip" data-query="What is the contact information?">📞 Contact</button>
+                    </div>
+                    <div class="message-meta">
+                        <span class="msg-time">Just now</span>
+                    </div>
                 </div>
-                <div class="input-wrapper">
-                    <textarea 
-                        id="userInput" 
-                        placeholder="Type your question here..." 
-                        rows="1"
-                    ></textarea>
-                    <button id="sendButton" disabled>
+            </div>
+
+        </section>
+
+        <!-- Typing Indicator (inside messages area, but controlled via JS) -->
+        <div class="typing-wrapper" id="typingWrapper">
+            <div class="avatar bot-av"><i class="fas fa-robot"></i></div>
+            <div class="typing-bubble">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+
+        <!-- Input -->
+        <footer class="chat-input-area">
+            <div class="input-container">
+                <textarea
+                    id="userInput"
+                    placeholder="Ask me anything about the college..."
+                    rows="1"
+                    aria-label="Type your message"
+                    maxlength="500"
+                ></textarea>
+                <div class="input-actions">
+                    <span class="char-count" id="charCount">0/500</span>
+                    <button id="sendBtn" disabled aria-label="Send message" title="Send">
                         <i class="fas fa-paper-plane"></i>
                     </button>
                 </div>
             </div>
-        </div>
-    </div>
-    
-    <script src="script.js"></script>
+            <p class="input-hint">Press <kbd>Enter</kbd> to send · <kbd>Shift+Enter</kbd> for new line</p>
+        </footer>
+
+    </main>
+
+</div>
+
+<!-- Toast notifications -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- Scripts -->
+<script src="js/script.js"></script>
 </body>
 </html>
