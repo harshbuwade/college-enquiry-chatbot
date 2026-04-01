@@ -77,7 +77,7 @@ async function sendMessage() {
         
         setTimeout(() => {
             addMessage(data.response, 'bot', data);
-        }, 500);
+        }, 300);
         
     } catch (error) {
         console.error('Error:', error);
@@ -96,14 +96,26 @@ function addMessage(text, sender, data = null) {
         hour12: true 
     });
     
-    // Convert \n to <br> and preserve all formatting
+    // Convert markdown-style formatting to HTML
     let formattedText = text
+        // Convert **bold** to <strong>
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        // Convert newlines to <br>
         .replace(/\n/g, '<br>')
+        // Add spacing for bullet points
         .replace(/•/g, '•')
-        .replace(/ {2,}/g, match => '&nbsp;'.repeat(match.length));
+        // Handle numbered emojis
+        .replace(/(\d+️⃣)/g, '<strong>$1</strong>');
     
-    // Add styling to the message
-    let messageContent = `<div class="message-text" style="line-height: 1.6;">${formattedText}</div>`;
+    // Handle indentation (spaces)
+    formattedText = formattedText.replace(/ {2,}/g, match => {
+        return '&nbsp;'.repeat(match.length);
+    });
+    
+    // Ensure proper spacing between sections
+    formattedText = formattedText.replace(/<br><br>/g, '<br><br>');
+    
+    const messageContent = `<div class="message-text">${formattedText}</div>`;
     
     messageDiv.innerHTML = `
         <div class="avatar">
@@ -165,6 +177,8 @@ function clearChatHistory() {
                         <button class="quick-question">Courses offered</button>
                         <button class="quick-question">Fee structure</button>
                         <button class="quick-question">Placement records</button>
+                        <button class="quick-question">Hostel facilities</button>
+                        <button class="quick-question">Find route from A to G</button>
                     </div>
                 </div>
                 <div class="message-time">Just now</div>
